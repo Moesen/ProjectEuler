@@ -1,12 +1,12 @@
-package main
+package GeneratePrimes
 
-import "fmt"
+import (
+	"math"
+)
 
-const N = 10001
-
-func odds(primeCh chan<- int, in <-chan int, out chan<- int) {
+func odds(primeCh chan<- int, in <-chan int, out chan<- int, n int) {
 Loop:
-	for i, j := 0, 3; i < N*100; i, j = i+1, j+2 {
+	for i, j := 0, 3; i < n*100; i, j = i+1, j+2 {
 		select {
 		case <-in:
 			break Loop
@@ -38,7 +38,8 @@ func sieve(primeCh chan<- int, in <-chan int, out chan<- int) {
 	close(out)
 }
 
-func generatePrimes(numOfPrimes int) []int {
+func generatePrimesN(numOfPrimes int) []int {
+	const N = 10001
 
 	ch1 := make(chan int)
 	var chs []chan int
@@ -48,7 +49,7 @@ func generatePrimes(numOfPrimes int) []int {
 
 	primeCh := make(chan int)
 
-	go odds(primeCh, chs[numOfPrimes-2], ch1)
+	go odds(primeCh, chs[numOfPrimes-2], ch1, N)
 	go sieve(primeCh, ch1, chs[0])
 	for i := 0; i < numOfPrimes-2; i++ {
 		go sieve(primeCh, chs[i], chs[i+1])
@@ -62,6 +63,32 @@ func generatePrimes(numOfPrimes int) []int {
 	return primes
 }
 
-func main() {
-	fmt.Println(generatePrimes(5))
+func generatePrimesLim(lim int) []int {
+	estimate := int(lim / int(math.Log(float64(lim))))
+	estimate = int(float64(estimate) * 1.5)
+
+	ch1 := make(chan int)
+	var chs []chan int
+	for i := 0; i < estimate; i++ {
+		chs = append(chs, make(chan int))
+	}
+
+	primeCh := make(chan int)
+
+	go odds(primeCh, chs[estimate-2], ch1, estimate)
+	go sieve(primeCh, ch1, chs[0])
+	for i := 0; i < estimate-2; i++ {
+		go sieve(primeCh, chs[i], chs[i+1])
+	}
+
+	primes := []int{}
+	for prime := range primeCh {
+		if prime <= lim {
+			primes = append(primes, prime)
+		} else {
+			break
+		}
+	}
+
+	return primes
 }
